@@ -14,27 +14,27 @@ stages: [test, build, secure]
 
 include:
   - project: "data-platform/infrastructure-base"
-    ref: "v0.1.48"
+    ref: "v0.2.16"
     file: "/ci/templates/java-build.gitlab-ci.yml"
     inputs:
       job_image: eclipse-temurin:21-jdk
       use_sdkman: "true"
       build_script: "./gradlew test"
   - project: "data-platform/infrastructure-base"
-    ref: "v0.1.48"
+    ref: "v0.2.16"
     file: "/ci/templates/tag-release.gitlab-ci.yml"
   - project: "data-platform/infrastructure-base"
-    ref: "v0.1.48"
+    ref: "v0.2.16"
     file: "/ci/templates/release-approval.gitlab-ci.yml"
   - project: "data-platform/infrastructure-base"
-    ref: "v0.1.48"
+    ref: "v0.2.16"
     file: "/ci/templates/container-publish.gitlab-ci.yml"
     inputs:
       job_image: eclipse-temurin:21-jdk
       use_sdkman: "true"
       build_script: "./gradlew bootJar && docker build -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHA} ."
   - project: "data-platform/infrastructure-base"
-    ref: "v0.1.48"
+    ref: "v0.2.16"
     file: "/ci/templates/container-secure.gitlab-ci.yml"
     inputs:
       image: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
