@@ -32,7 +32,7 @@ include:
     inputs:
       job_image: eclipse-temurin:21-jdk
       use_sdkman: "true"
-      build_script: "./gradlew bootJar && docker build -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHA} ."
+      build_script: "./gradlew bootBuildImage --imageName=${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHA}"
   - project: "data-platform/infrastructure-base"
     ref: "v0.1.48"
     file: "/ci/templates/container-secure.gitlab-ci.yml"

@@ -77,8 +77,9 @@ dependencyManagement {
 
 ext['netty.version'] = nettyVersion
 ext['httpcore5.version'] = '5.4.3'
-ext['jackson-bom.version'] = jackson2Version
-ext['jackson-annotations.version'] = jackson2AnnotationsVersion
+// Boot 4: jackson-bom = tools.jackson (3.x); jackson-2-bom = com.fasterxml (2.x).
+ext['jackson-bom.version'] = jackson3Version
+ext['jackson-2-bom.version'] = jackson2Version
 
 configurations.configureEach {
   resolutionStrategy {
