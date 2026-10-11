@@ -33,6 +33,8 @@ ext {
   springCloudVersion          = "2025.1.1"
   lz4JavaVersion              = "1.11.4"
   jackson2Version             = "2.21.7"
+  // jackson-annotations dropped patch versions from 2.20+ (BOM uses 2.21).
+  jackson2AnnotationsVersion  = "2.21"
   jackson3Version             = "3.1.7"
 }
 
@@ -75,8 +77,8 @@ dependencyManagement {
 
 ext['netty.version'] = nettyVersion
 ext['httpcore5.version'] = '5.4.3'
-ext['jackson-bom.version'] = jackson3Version
-ext['jackson-annotations.version'] = jackson2Version
+ext['jackson-bom.version'] = jackson2Version
+ext['jackson-annotations.version'] = jackson2AnnotationsVersion
 
 configurations.configureEach {
   resolutionStrategy {
@@ -86,7 +88,7 @@ configurations.configureEach {
       "com.fasterxml.jackson:jackson-bom:$jackson2Version",
       "com.fasterxml.jackson.core:jackson-core:$jackson2Version",
       "com.fasterxml.jackson.core:jackson-databind:$jackson2Version",
-      "com.fasterxml.jackson.core:jackson-annotations:$jackson2Version",
+      "com.fasterxml.jackson.core:jackson-annotations:$jackson2AnnotationsVersion",
       "tools.jackson:jackson-bom:$jackson3Version",
       "tools.jackson.core:jackson-core:$jackson3Version",
       "tools.jackson.core:jackson-databind:$jackson3Version",
@@ -96,7 +98,11 @@ configurations.configureEach {
           || details.requested.group == 'com.fasterxml.jackson.module'
           || details.requested.group == 'com.fasterxml.jackson.datatype'
           || details.requested.group == 'com.fasterxml.jackson.dataformat') {
-        details.useVersion jackson2Version
+        if (details.requested.name == 'jackson-annotations') {
+          details.useVersion jackson2AnnotationsVersion
+        } else {
+          details.useVersion jackson2Version
+        }
         details.because 'Align Jackson 2.x for Trivy.'
       }
       if (details.requested.group == 'tools.jackson.core'
