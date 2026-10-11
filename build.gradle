@@ -386,7 +386,7 @@ tasks.named("check").configure {
 
 bootBuildImage {
   builder = "paketobuildpacks/builder-jammy-base:0.4.659"
-  runImage = "paketobuildpacks/run-jammy-base:latest"
+  runImage = "paketobuildpacks/run-jammy-base:0.1.282"
   // Prefer Corretto over BellSoft Liberica — Liberica is fetched from GitHub and fails in CI.
   buildpacks = [
     "docker.io/paketobuildpacks/amazon-corretto",
