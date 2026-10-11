@@ -51,3 +51,17 @@ trivy:
   needs:
     - job: container_publish
       artifacts: false
+  script:
+    - |
+      set -euo pipefail
+      echo "Scanning ${SECURE_IMAGE} (fail on ${TRIVY_FAIL_SEVERITY}; skip Paketo/CNB helper gobins)"
+      trivy image \
+        --exit-code 1 \
+        --severity "${TRIVY_FAIL_SEVERITY}" \
+        --ignore-unfixed \
+        --no-progress \
+        --format table \
+        --skip-files "**/cnb/lifecycle/**" \
+        --skip-files "**/layers/paketo-buildpacks_*/helper/**" \
+        --skip-files "**/layers/sbom/**" \
+        "${SECURE_IMAGE}"
