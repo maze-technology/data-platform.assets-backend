@@ -1,11 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
-  "baseBranches": [
-    "develop"
-  ],
+  "extends": ["config:recommended"],
+  "baseBranchPatterns": ["develop"],
   "automerge": true,
   "automergeType": "pr",
   "gradle": {
@@ -14,9 +10,7 @@
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": [
-        "/(^|/)build\\.gradle$/"
-      ],
+      "managerFilePatterns": ["/(^|/)build\\.gradle$/"],
       "matchStrings": [
         "builder\\s*=\\s*[\"'](?<depName>.*?):(?<currentValue>.*?)[\"']"
       ],
@@ -25,40 +19,23 @@
   ],
   "packageRules": [
     {
-      "matchCategories": [
-        "docker"
-      ],
+      "matchCategories": ["docker"],
       "enabled": true
     },
     {
-      "matchManagers": [
-        "gradle"
-      ],
-      "reviewers": [
-        "maze-technology/engineers"
-      ],
+      "matchManagers": ["gradle"],
+      "reviewers": ["maze-technology/engineers"],
       "groupName": "Gradle"
     },
     {
-      "matchManagers": [
-        "docker",
-        "custom.regex"
-      ],
-      "matchDatasources": [
-        "docker"
-      ],
-      "reviewers": [
-        "maze-technology/infrastructure-engineers"
-      ],
+      "matchManagers": ["docker", "custom.regex"],
+      "matchDatasources": ["docker"],
+      "reviewers": ["maze-technology/infrastructure-engineers"],
       "groupName": "Docker"
     },
     {
-      "matchManagers": [
-        "github-actions"
-      ],
-      "reviewers": [
-        "maze-technology/infrastructure-engineers"
-      ],
+      "matchManagers": ["github-actions"],
+      "reviewers": ["maze-technology/infrastructure-engineers"],
       "groupName": "GitHub Actions"
     }
   ],
