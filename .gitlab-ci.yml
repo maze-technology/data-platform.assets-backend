@@ -10,7 +10,7 @@
 # Gradle resolve uses GitLab group Maven (GITLAB_MAVEN_* group CI vars / CI_JOB_TOKEN).
 # SDKMAN runs when .sdkmanrc is present (use_sdkman default true in templates).
 
-stages: [test, build, secure]
+stages: [validate, test, build, secure, publish]
 
 include:
   - project: "data-platform/infrastructure-base"
