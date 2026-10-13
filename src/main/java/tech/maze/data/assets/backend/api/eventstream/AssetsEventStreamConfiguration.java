@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import tech.maze.commons.eventstream.EventSender;
 import tech.maze.commons.eventstream.MazeEventProperties;
+import tech.maze.data.assets.backend.AppProperties;
 import tech.maze.data.assets.backend.domain.models.SyncAssetsResult;
 import tech.maze.data.assets.backend.domain.ports.in.SyncAssetsUseCase;
 import tech.maze.dtos.assets.events.EventTypes;
@@ -28,17 +29,19 @@ import tech.maze.dtos.assets.payloads.SyncAssetsResponse;
  * Event stream configuration for assets Sync/Fetch orchestration.
  *
  * <p>Flow: SyncAssetsRequest → fan-out FetchAssetsRequest on a fixed topic →
- * correlate FetchAssetsResponse by {@code correlationid} → SyncAssetsResponse.
+ * upsert AssetMetaDatas from each FetchAssetsResponse → correlate by
+ * {@code correlationid} → SyncAssetsResponse.
  */
 @Configuration
 @RequiredArgsConstructor
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EnableConfigurationProperties(MazeEventProperties.class)
+@EnableConfigurationProperties({MazeEventProperties.class, AppProperties.class})
 @Slf4j
 public class AssetsEventStreamConfiguration {
   EventSender eventSender;
   ObjectProvider<MeterRegistry> meterRegistryProvider;
   SyncAssetsUseCase syncAssetsUseCase;
+  AssetMetaDatasEventService assetMetaDatasEventService;
 
   /**
    * Handles SyncAssetsRequest: starts correlation and fans out FetchAssetsRequest.
@@ -70,7 +73,7 @@ public class AssetsEventStreamConfiguration {
   }
 
   /**
-   * Handles FetchAssetsResponse fan-in for in-flight sync sessions.
+   * Handles FetchAssetsResponse: upserts asset metadata, then fans in sync completion.
    *
    * @return a consumer for CloudEvents
    */
@@ -93,6 +96,10 @@ public class AssetsEventStreamConfiguration {
         log.error("Failed to parse FetchAssetsResponse for event {}", event.getId(), ex);
         incrementFailure(EventTypes.FETCH_ASSETS_RESPONSE);
         return;
+      }
+
+      if (response.hasAssetMetaDatas()) {
+        assetMetaDatasEventService.process(response.getAssetMetaDatas());
       }
 
       final String correlationId = eventSender.resolveCorrelationId(event);

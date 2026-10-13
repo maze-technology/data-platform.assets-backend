@@ -28,6 +28,8 @@ import tech.maze.commons.eventstream.EventSender;
 import tech.maze.data.assets.backend.domain.models.SyncAssetsResult;
 import tech.maze.data.assets.backend.domain.ports.in.SyncAssetsUseCase;
 import tech.maze.dtos.assets.events.EventTypes;
+import tech.maze.dtos.assets.models.AssetMetaDatas;
+import tech.maze.dtos.assets.models.AssetMetaDatasAsset;
 import tech.maze.dtos.assets.payloads.FetchAssetsResponse;
 import tech.maze.dtos.assets.payloads.SyncAssetsResponse;
 
@@ -42,6 +44,9 @@ class AssetsEventStreamConfigurationTest {
   @Mock
   private SyncAssetsUseCase syncAssetsUseCase;
 
+  @Mock
+  private AssetMetaDatasEventService assetMetaDatasEventService;
+
   private AssetsEventStreamConfiguration configuration;
 
   @BeforeEach
@@ -49,7 +54,8 @@ class AssetsEventStreamConfigurationTest {
     configuration = new AssetsEventStreamConfiguration(
         eventSender,
         meterRegistryProvider,
-        syncAssetsUseCase
+        syncAssetsUseCase,
+        assetMetaDatasEventService
     );
   }
 
@@ -88,12 +94,27 @@ class AssetsEventStreamConfigurationTest {
   }
 
   @Test
-  void completesSyncAndRepliesOnFetchFanIn() {
+  void upsertsMetaAndCompletesSyncOnFetchFanIn() {
     Consumer<CloudEvent> consumer = configuration.fetchAssetsResponseConsumer();
+    final String providerId = "11111111-1111-1111-1111-111111111111";
+    AssetMetaDatas metaDatas = AssetMetaDatas.newBuilder()
+        .setDataProviderId(Value.newBuilder().setStringValue(providerId).build())
+        .setAsset(
+            AssetMetaDatasAsset.newBuilder()
+                .setId("BTC")
+                .setSymbol("BTC")
+                .setName("Bitcoin")
+                .build()
+        )
+        .setPrimaryClass(tech.maze.dtos.assets.enums.PrimaryClass.CRYPTO)
+        .putExtraDatas("k", "v")
+        .putToolBox("k", "v")
+        .build();
     FetchAssetsResponse response = FetchAssetsResponse.newBuilder()
         .setIsLast(true)
         .setSkipped(2)
         .setDataProvider(Value.newBuilder().setStringValue("dp-1").build())
+        .setAssetMetaDatas(metaDatas)
         .build();
     CloudEvent event = CloudEventBuilder.v1()
         .withId("evt-fetch")
@@ -105,24 +126,32 @@ class AssetsEventStreamConfigurationTest {
     when(eventSender.resolveCorrelationId(event)).thenReturn("corr-1");
     when(syncAssetsUseCase.onFetchResponse("corr-1", "dp-1", 2L, true))
         .thenReturn(Optional.of(new SyncAssetsResult(2L, "reply-topic")));
-    when(eventSender.send(eq("reply-topic"), any(SyncAssetsResponse.class), eq(EventTypes.SYNC_ASSETS_RESPONSE)))
-        .thenReturn(true);
+    when(
+        eventSender.send(
+            eq("reply-topic"),
+            any(SyncAssetsResponse.class),
+            eq(EventTypes.SYNC_ASSETS_RESPONSE)
+        )
+    ).thenReturn(true);
 
     consumer.accept(event);
 
-    verify(eventSender).send(eq("reply-topic"), any(SyncAssetsResponse.class), eq(EventTypes.SYNC_ASSETS_RESPONSE));
+    verify(assetMetaDatasEventService).process(metaDatas);
+    verify(eventSender).send(
+        eq("reply-topic"),
+        any(SyncAssetsResponse.class),
+        eq(EventTypes.SYNC_ASSETS_RESPONSE)
+    );
   }
 
   @Test
   void recordsMetricWhenSyncStartFails() {
-    Consumer<CloudEvent> consumer = configuration.syncAssetsRequestConsumer();
     CloudEvent event = CloudEventBuilder.v1()
         .withId("evt-sync")
         .withSource(URI.create("urn:test"))
         .withType(EventTypes.SYNC_ASSETS_REQUEST)
         .withData(BytesCloudEventData.wrap(new byte[0]))
         .build();
-
     when(eventSender.resolveCorrelationId(event)).thenReturn(null);
     when(eventSender.resolveReplyTo(event)).thenReturn("reply-topic");
     when(syncAssetsUseCase.startSync(anyString(), eq("reply-topic"))).thenReturn(false);
@@ -130,12 +159,21 @@ class AssetsEventStreamConfigurationTest {
     SimpleMeterRegistry registry = new SimpleMeterRegistry();
     when(meterRegistryProvider.getIfAvailable()).thenReturn(registry);
 
-    consumer.accept(event);
+    configuration.syncAssetsRequestConsumer().accept(event);
 
     assertEquals(
         1.0,
-        registry.counter("maze.events.reply.failed", "eventType", EventTypes.SYNC_ASSETS_REQUEST).count()
+        registry.counter(
+            "maze.events.reply.failed",
+            "eventType",
+            EventTypes.SYNC_ASSETS_REQUEST
+        ).count()
     );
-    verify(syncAssetsUseCase, never()).onFetchResponse(anyString(), anyString(), anyLong(), anyBoolean());
+    verify(syncAssetsUseCase, never()).onFetchResponse(
+        anyString(),
+        anyString(),
+        anyLong(),
+        anyBoolean()
+    );
   }
 }
