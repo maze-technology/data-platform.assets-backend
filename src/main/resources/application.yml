@@ -28,5 +28,25 @@ spring:
     enabled: true
   cache:
     enabled: false
+  cloud:
+    function:
+      definition: syncAssetsRequestConsumer;fetchAssetsResponseConsumer
+    stream:
+      bindings:
+        syncAssetsRequestConsumer-in-0:
+          destination: ${ASSETS_SYNC_REQUEST_TOPIC:assets.sync.request}
+          group: assets
+        fetchAssetsResponseConsumer-in-0:
+          destination: ${ASSETS_FETCH_RESPONSE_TOPIC:assets.fetch.response}
+          group: assets
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9092}
 maze:
   assets-per-page: 50
+  events:
+    enabled: true
+    source: urn:service:assets
+  sync:
+    fetch-request-topic: ${ASSETS_FETCH_REQUEST_TOPIC:assets.fetch.request}
+    fetch-response-topic: ${ASSETS_FETCH_RESPONSE_TOPIC:assets.fetch.response}
