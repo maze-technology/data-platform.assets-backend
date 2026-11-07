@@ -27,11 +27,17 @@ public class AppProperties {
 
   /**
    * Sync/fetch properties. Topic names are wiring concerns — override via
-   * {@code ASSETS_FETCH_REQUEST_TOPIC} / {@code ASSETS_FETCH_RESPONSE_TOPIC}.
+   * {@code ASSETS_SYNC_RESPONSE_TOPIC} / {@code ASSETS_FETCH_REQUEST_TOPIC} /
+   * {@code ASSETS_FETCH_RESPONSE_TOPIC}.
    */
   @Data
   @FieldDefaults(level = AccessLevel.PRIVATE)
   public static class Sync {
+    /**
+     * Fixed Kafka topic for SyncAssetsResponse publication.
+     */
+    String responseTopic = "assets.sync.response";
+
     /**
      * Fixed Kafka topic for FetchAssetsRequest fan-out to data providers.
      */

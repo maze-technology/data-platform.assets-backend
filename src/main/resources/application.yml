@@ -48,5 +48,6 @@ maze:
     enabled: true
     source: urn:service:assets
   sync:
+    response-topic: ${ASSETS_SYNC_RESPONSE_TOPIC:assets.sync.response}
     fetch-request-topic: ${ASSETS_FETCH_REQUEST_TOPIC:assets.fetch.request}
     fetch-response-topic: ${ASSETS_FETCH_RESPONSE_TOPIC:assets.fetch.response}

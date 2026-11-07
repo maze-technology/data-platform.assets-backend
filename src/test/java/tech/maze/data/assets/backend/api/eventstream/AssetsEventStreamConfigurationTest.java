@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -25,6 +26,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import tech.maze.commons.eventstream.EventSender;
+import tech.maze.data.assets.backend.AppProperties;
 import tech.maze.data.assets.backend.domain.models.SyncAssetsResult;
 import tech.maze.data.assets.backend.domain.ports.in.SyncAssetsUseCase;
 import tech.maze.dtos.assets.events.EventTypes;
@@ -47,15 +49,18 @@ class AssetsEventStreamConfigurationTest {
   @Mock
   private AssetMetaDatasEventService assetMetaDatasEventService;
 
+  private AppProperties appProperties;
   private AssetsEventStreamConfiguration configuration;
 
   @BeforeEach
   void setUp() {
+    appProperties = new AppProperties();
     configuration = new AssetsEventStreamConfiguration(
         eventSender,
         meterRegistryProvider,
         syncAssetsUseCase,
-        assetMetaDatasEventService
+        assetMetaDatasEventService,
+        appProperties
     );
   }
 
@@ -71,11 +76,11 @@ class AssetsEventStreamConfigurationTest {
 
     consumer.accept(event);
 
-    verify(syncAssetsUseCase, never()).startSync(anyString(), any());
+    verify(syncAssetsUseCase, never()).startSync(anyString());
   }
 
   @Test
-  void startsSyncWhenReplyToPresent() {
+  void startsSyncWithCorrelationId() {
     Consumer<CloudEvent> consumer = configuration.syncAssetsRequestConsumer();
     CloudEvent event = CloudEventBuilder.v1()
         .withId("evt-sync")
@@ -85,12 +90,11 @@ class AssetsEventStreamConfigurationTest {
         .build();
 
     when(eventSender.resolveCorrelationId(event)).thenReturn("corr-1");
-    when(eventSender.resolveReplyTo(event)).thenReturn("reply-topic");
-    when(syncAssetsUseCase.startSync("corr-1", "reply-topic")).thenReturn(true);
+    when(syncAssetsUseCase.startSync("corr-1")).thenReturn(true);
 
     consumer.accept(event);
 
-    verify(syncAssetsUseCase).startSync("corr-1", "reply-topic");
+    verify(syncAssetsUseCase).startSync("corr-1");
   }
 
   @Test
@@ -125,12 +129,13 @@ class AssetsEventStreamConfigurationTest {
 
     when(eventSender.resolveCorrelationId(event)).thenReturn("corr-1");
     when(syncAssetsUseCase.onFetchResponse("corr-1", "dp-1", 2L, true))
-        .thenReturn(Optional.of(new SyncAssetsResult(2L, "reply-topic")));
+        .thenReturn(Optional.of(new SyncAssetsResult(2L)));
     when(
         eventSender.send(
-            eq("reply-topic"),
+            eq("assets.sync.response"),
             any(SyncAssetsResponse.class),
-            eq(EventTypes.SYNC_ASSETS_RESPONSE)
+            eq(EventTypes.SYNC_ASSETS_RESPONSE),
+            anyMap()
         )
     ).thenReturn(true);
 
@@ -138,9 +143,10 @@ class AssetsEventStreamConfigurationTest {
 
     verify(assetMetaDatasEventService).process(metaDatas);
     verify(eventSender).send(
-        eq("reply-topic"),
+        eq("assets.sync.response"),
         any(SyncAssetsResponse.class),
-        eq(EventTypes.SYNC_ASSETS_RESPONSE)
+        eq(EventTypes.SYNC_ASSETS_RESPONSE),
+        anyMap()
     );
   }
 
@@ -153,8 +159,7 @@ class AssetsEventStreamConfigurationTest {
         .withData(BytesCloudEventData.wrap(new byte[0]))
         .build();
     when(eventSender.resolveCorrelationId(event)).thenReturn(null);
-    when(eventSender.resolveReplyTo(event)).thenReturn("reply-topic");
-    when(syncAssetsUseCase.startSync(anyString(), eq("reply-topic"))).thenReturn(false);
+    when(syncAssetsUseCase.startSync(anyString())).thenReturn(false);
 
     SimpleMeterRegistry registry = new SimpleMeterRegistry();
     when(meterRegistryProvider.getIfAvailable()).thenReturn(registry);
