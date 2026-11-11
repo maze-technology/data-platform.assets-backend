@@ -44,7 +44,7 @@ class SyncAssetsUseCaseImplTest {
         anyMap()
     )).thenReturn(true);
 
-    assertThat(useCase.startSync("corr-1", "reply-topic")).isTrue();
+    assertThat(useCase.startSync("corr-1")).isTrue();
     verify(eventSender).send(
         eq("assets.fetch.request"),
         any(FetchAssetsRequest.class),
@@ -56,13 +56,12 @@ class SyncAssetsUseCaseImplTest {
   @Test
   void completesOnlyAfterAllExpectedProvidersReportLast() {
     when(eventSender.send(any(), any(), any(), anyMap())).thenReturn(true);
-    useCase.startSync("corr-1", "reply-topic");
+    useCase.startSync("corr-1");
 
     assertThat(useCase.onFetchResponse("corr-1", "dp-a", 1, true)).isEmpty();
 
     Optional<SyncAssetsResult> result = useCase.onFetchResponse("corr-1", "dp-b", 2, true);
     assertThat(result).isPresent();
     assertThat(result.get().skipped()).isEqualTo(3);
-    assertThat(result.get().replyTo()).isEqualTo("reply-topic");
   }
 }

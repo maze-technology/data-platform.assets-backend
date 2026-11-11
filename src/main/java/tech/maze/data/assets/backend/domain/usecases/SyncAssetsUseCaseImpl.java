@@ -34,12 +34,12 @@ public class SyncAssetsUseCaseImpl implements SyncAssetsUseCase {
   Map<String, SyncSession> sessions = new ConcurrentHashMap<>();
 
   @Override
-  public boolean startSync(String correlationId, String replyTo) {
+  public boolean startSync(String correlationId) {
     if (correlationId == null || correlationId.isBlank()) {
       throw new IllegalArgumentException("correlationId is required");
     }
 
-    final SyncSession session = new SyncSession(replyTo, Instant.now());
+    final SyncSession session = new SyncSession(Instant.now());
     sessions.put(correlationId, session);
 
     final String topic = appProperties.getSync().getFetchRequestTopic();
@@ -47,10 +47,7 @@ public class SyncAssetsUseCaseImpl implements SyncAssetsUseCase {
         topic,
         FetchAssetsRequest.getDefaultInstance(),
         EventTypes.FETCH_ASSETS_REQUEST,
-        Map.of(
-            EventSender.CORRELATION_ID_EXTENSION, correlationId,
-            EventSender.REPLY_TO_EXTENSION, appProperties.getSync().getFetchResponseTopic()
-        )
+        Map.of(EventSender.CORRELATION_ID_EXTENSION, correlationId)
     );
 
     if (!sent) {
@@ -100,7 +97,7 @@ public class SyncAssetsUseCaseImpl implements SyncAssetsUseCase {
     }
 
     sessions.remove(correlationId);
-    return Optional.of(new SyncAssetsResult(session.getSkipped().get(), session.getReplyTo()));
+    return Optional.of(new SyncAssetsResult(session.getSkipped().get()));
   }
 
   private boolean isComplete(SyncSession session) {
@@ -122,13 +119,11 @@ public class SyncAssetsUseCaseImpl implements SyncAssetsUseCase {
   @Getter
   @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
   private static final class SyncSession {
-    String replyTo;
     Instant startedAt;
     AtomicLong skipped = new AtomicLong();
     Set<String> completedProviders = ConcurrentHashMap.newKeySet();
 
-    SyncSession(String replyTo, Instant startedAt) {
-      this.replyTo = replyTo;
+    SyncSession(Instant startedAt) {
       this.startedAt = startedAt;
     }
   }

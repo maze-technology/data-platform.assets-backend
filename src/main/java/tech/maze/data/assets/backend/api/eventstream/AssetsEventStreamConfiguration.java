@@ -5,6 +5,7 @@ import com.google.protobuf.Value;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.CloudEventData;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -30,7 +31,7 @@ import tech.maze.dtos.assets.payloads.SyncAssetsResponse;
  *
  * <p>Flow: SyncAssetsRequest → fan-out FetchAssetsRequest on a fixed topic →
  * upsert AssetMetaDatas from each FetchAssetsResponse → correlate by
- * {@code correlationid} → SyncAssetsResponse.
+ * {@code correlationid} → SyncAssetsResponse on a fixed topic.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -42,6 +43,7 @@ public class AssetsEventStreamConfiguration {
   ObjectProvider<MeterRegistry> meterRegistryProvider;
   SyncAssetsUseCase syncAssetsUseCase;
   AssetMetaDatasEventService assetMetaDatasEventService;
+  AppProperties appProperties;
 
   /**
    * Handles SyncAssetsRequest: starts correlation and fans out FetchAssetsRequest.
@@ -63,9 +65,8 @@ public class AssetsEventStreamConfiguration {
       final String correlationId = Optional.ofNullable(eventSender.resolveCorrelationId(event))
           .filter(id -> !id.isBlank())
           .orElseGet(() -> event.getId() == null ? UUID.randomUUID().toString() : event.getId());
-      final String replyTo = eventSender.resolveReplyTo(event);
 
-      final boolean started = syncAssetsUseCase.startSync(correlationId, replyTo);
+      final boolean started = syncAssetsUseCase.startSync(correlationId);
       if (!started) {
         incrementFailure(EventTypes.SYNC_ASSETS_REQUEST);
       }
@@ -112,23 +113,17 @@ public class AssetsEventStreamConfiguration {
       );
 
       completed.ifPresent(result -> {
-        final String replyTo = result.replyTo();
-        if (replyTo == null || replyTo.isBlank()) {
-          log.info(
-              "Sync {} completed with skipped={} (no replyto)",
-              correlationId,
-              result.skipped()
-          );
-          return;
-        }
-
         final SyncAssetsResponse syncResponse = SyncAssetsResponse.newBuilder()
             .setSkipped(result.skipped())
             .build();
+        final String destination = appProperties.getSync().getResponseTopic();
         final boolean sent = eventSender.send(
-            replyTo,
+            destination,
             syncResponse,
-            EventTypes.SYNC_ASSETS_RESPONSE
+            EventTypes.SYNC_ASSETS_RESPONSE,
+            correlationId == null || correlationId.isBlank()
+                ? Map.of()
+                : Map.of(EventSender.CORRELATION_ID_EXTENSION, correlationId)
         );
         if (!sent) {
           log.error("Failed to dispatch SyncAssetsResponse for correlation {}", correlationId);
