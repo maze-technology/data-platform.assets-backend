@@ -51,3 +51,6 @@ maze:
     response-topic: ${ASSETS_SYNC_RESPONSE_TOPIC:assets.sync.response}
     fetch-request-topic: ${ASSETS_FETCH_REQUEST_TOPIC:assets.fetch.request}
     fetch-response-topic: ${ASSETS_FETCH_RESPONSE_TOPIC:assets.fetch.response}
+    timeout: ${ASSETS_SYNC_TIMEOUT:1m}
+    timeout-poll-interval: ${ASSETS_SYNC_TIMEOUT_POLL_INTERVAL:5s}
+    session-store: ${ASSETS_SYNC_SESSION_STORE:memory}

@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tech.maze.commons.eventstream.EventSender;
 import tech.maze.data.assets.backend.AppProperties;
 import tech.maze.data.assets.backend.domain.models.SyncAssetsResult;
+import tech.maze.data.assets.backend.infrastructure.sync.InMemorySyncSessionStore;
+import tech.maze.dtos.assets.enums.SyncStatus;
 import tech.maze.dtos.assets.events.EventTypes;
 import tech.maze.dtos.assets.payloads.FetchAssetsRequest;
 
@@ -32,7 +35,12 @@ class SyncAssetsUseCaseImplTest {
   void setUp() {
     appProperties = new AppProperties();
     appProperties.getSync().setExpectedDataProviders(List.of("dp-a", "dp-b"));
-    useCase = new SyncAssetsUseCaseImpl(eventSender, appProperties);
+    appProperties.getSync().setTimeout(Duration.ofMinutes(1));
+    useCase = new SyncAssetsUseCaseImpl(
+        eventSender,
+        appProperties,
+        new InMemorySyncSessionStore(appProperties)
+    );
   }
 
   @Test
@@ -54,14 +62,32 @@ class SyncAssetsUseCaseImplTest {
   }
 
   @Test
-  void completesOnlyAfterAllExpectedProvidersReportLast() {
+  void completesOnlyAfterContiguousPagesAndAllProviders() {
     when(eventSender.send(any(), any(), any(), anyMap())).thenReturn(true);
     useCase.startSync("corr-1");
 
-    assertThat(useCase.onFetchResponse("corr-1", "dp-a", 1, true)).isEmpty();
+    assertThat(useCase.onFetchResponse("corr-1", "dp-a", 0, 1, false)).isEmpty();
+    assertThat(useCase.onFetchResponse("corr-1", "dp-a", 1, 0, true)).isEmpty();
+    assertThat(useCase.onFetchResponse("corr-1", "dp-b", 0, 2, true)).isPresent().get()
+        .satisfies(result -> {
+          assertThat(result.skipped()).isEqualTo(3);
+          assertThat(result.status()).isEqualTo(SyncStatus.COMPLETED);
+          assertThat(result.incompleteProviders()).isEmpty();
+        });
+  }
 
-    Optional<SyncAssetsResult> result = useCase.onFetchResponse("corr-1", "dp-b", 2, true);
+  @Test
+  void doesNotCompleteWhenLastArrivesBeforeMissingPages() {
+    when(eventSender.send(any(), any(), any(), anyMap())).thenReturn(true);
+    useCase.startSync("corr-1");
+
+    // isLast on page 1 but page 0 missing — barrier holds
+    assertThat(useCase.onFetchResponse("corr-1", "dp-a", 1, 0, true)).isEmpty();
+    assertThat(useCase.onFetchResponse("corr-1", "dp-b", 0, 0, true)).isEmpty();
+
+    // fill gap
+    Optional<SyncAssetsResult> result = useCase.onFetchResponse("corr-1", "dp-a", 0, 0, false);
     assertThat(result).isPresent();
-    assertThat(result.get().skipped()).isEqualTo(3);
+    assertThat(result.get().status()).isEqualTo(SyncStatus.COMPLETED);
   }
 }

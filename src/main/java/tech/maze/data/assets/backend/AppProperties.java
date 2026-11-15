@@ -49,15 +49,25 @@ public class AppProperties {
     String fetchResponseTopic = "assets.fetch.response";
 
     /**
-     * Expected data-provider identifiers that must each emit {@code isLast=true}
-     * before a SyncAssetsRequest is considered complete. When empty, the first
-     * distinct provider that reports {@code isLast} completes the sync (dev mode).
+     * Expected data-provider identifiers that must each finish contiguous
+     * {@code pageIndex} pages through {@code isLast} before a sync completes.
+     * When empty, the first provider that finishes completes the sync (dev mode).
      */
     List<String> expectedDataProviders = new ArrayList<>();
 
     /**
-     * Maximum time to wait for fan-in before failing the sync session.
+     * Maximum time to wait for fan-in before emitting TIMEOUT/PARTIAL.
      */
-    Duration timeout = Duration.ofMinutes(5);
+    Duration timeout = Duration.ofMinutes(1);
+
+    /**
+     * How often to scan for expired sync deadlines.
+     */
+    Duration timeoutPollInterval = Duration.ofSeconds(5);
+
+    /**
+     * Session store backend: {@code memory} (default) or {@code redis} (Valkey).
+     */
+    String sessionStore = "memory";
   }
 }

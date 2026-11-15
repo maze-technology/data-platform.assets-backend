@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -29,6 +28,7 @@ import tech.maze.commons.eventstream.EventSender;
 import tech.maze.data.assets.backend.AppProperties;
 import tech.maze.data.assets.backend.domain.models.SyncAssetsResult;
 import tech.maze.data.assets.backend.domain.ports.in.SyncAssetsUseCase;
+import tech.maze.data.assets.backend.infrastructure.sync.SyncAssetsResponsePublisher;
 import tech.maze.dtos.assets.events.EventTypes;
 import tech.maze.dtos.assets.models.AssetMetaDatas;
 import tech.maze.dtos.assets.models.AssetMetaDatasAsset;
@@ -49,6 +49,9 @@ class AssetsEventStreamConfigurationTest {
   @Mock
   private AssetMetaDatasEventService assetMetaDatasEventService;
 
+  @Mock
+  private SyncAssetsResponsePublisher syncAssetsResponsePublisher;
+
   private AppProperties appProperties;
   private AssetsEventStreamConfiguration configuration;
 
@@ -60,7 +63,8 @@ class AssetsEventStreamConfigurationTest {
         meterRegistryProvider,
         syncAssetsUseCase,
         assetMetaDatasEventService,
-        appProperties
+        appProperties,
+        syncAssetsResponsePublisher
     );
   }
 
@@ -128,26 +132,14 @@ class AssetsEventStreamConfigurationTest {
         .build();
 
     when(eventSender.resolveCorrelationId(event)).thenReturn("corr-1");
-    when(syncAssetsUseCase.onFetchResponse("corr-1", "dp-1", 2L, true))
-        .thenReturn(Optional.of(new SyncAssetsResult(2L)));
-    when(
-        eventSender.send(
-            eq("assets.sync.response"),
-            any(SyncAssetsResponse.class),
-            eq(EventTypes.SYNC_ASSETS_RESPONSE),
-            anyMap()
-        )
-    ).thenReturn(true);
-
+    when(syncAssetsUseCase.onFetchResponse("corr-1", "dp-1", 0, 2L, true))
+        .thenReturn(Optional.of(SyncAssetsResult.completed(2L)));
+    when(syncAssetsResponsePublisher.publish(eq("corr-1"), any(SyncAssetsResult.class)))
+        .thenReturn(true);
     consumer.accept(event);
 
     verify(assetMetaDatasEventService).process(metaDatas);
-    verify(eventSender).send(
-        eq("assets.sync.response"),
-        any(SyncAssetsResponse.class),
-        eq(EventTypes.SYNC_ASSETS_RESPONSE),
-        anyMap()
-    );
+    verify(syncAssetsResponsePublisher).publish(eq("corr-1"), any(SyncAssetsResult.class));
   }
 
   @Test
@@ -177,6 +169,7 @@ class AssetsEventStreamConfigurationTest {
     verify(syncAssetsUseCase, never()).onFetchResponse(
         anyString(),
         anyString(),
+        org.mockito.ArgumentMatchers.anyInt(),
         anyLong(),
         anyBoolean()
     );
