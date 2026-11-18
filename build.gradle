@@ -29,7 +29,10 @@ ext {
   lombokMapstructBindingVersion = "0.2.0"
   flywayVersion               = "13.0.0"
   mapStructSpringVersion      = "2.0.0"
-  cloudEventsSpringVersion    = "5.0.0"
+  // 5.0.0 parent imports jakartaee-bom 10 (persistence-api 3.1.0), which the
+  // Spring dependency-management plugin merges over Boot 4's 3.2.0 and breaks
+  // Hibernate 7 (ClassNotFoundException: jakarta.persistence.FindOption).
+  cloudEventsSpringVersion    = "5.1.0"
   springCloudVersion          = "2025.1.1"
   lz4JavaVersion              = "1.11.4"
   guavaVersion                = "33.8.0-jre"
@@ -88,6 +91,9 @@ configurations.configureEach {
       "org.xerial.snappy:snappy-java:$snappyJavaVersion",
       "org.apache.httpcomponents.core5:httpcore5:5.4.3",
       "org.apache.httpcomponents.core5:httpcore5-h2:5.4.3",
+      // Boot 4 / Hibernate 7 require JPA 3.2 (FindOption). Keep forced so a BOM
+      // regression cannot silently ship jakarta.persistence-api 3.1.0 again.
+      "jakarta.persistence:jakarta.persistence-api:3.2.0",
       "com.fasterxml.jackson:jackson-bom:$jackson2Version",
       "com.fasterxml.jackson.core:jackson-core:$jackson2Version",
       "com.fasterxml.jackson.core:jackson-databind:$jackson2Version",
@@ -379,9 +385,34 @@ tasks.named("checkstyleMain", Checkstyle) {
   }
 }
 
+tasks.register("assertJpaApiVersion") {
+  group = "verification"
+  description = "Fail if runtimeClasspath resolves jakarta.persistence-api below 3.2 (Hibernate 7 / FindOption)."
+  def runtimeClasspath = configurations.named("runtimeClasspath")
+  inputs.files(runtimeClasspath)
+  doLast {
+    def persistenceJars = runtimeClasspath.get().files.findAll { it.name.startsWith("jakarta.persistence-api-") }
+    if (persistenceJars.isEmpty()) {
+      throw new GradleException("jakarta.persistence-api missing from runtimeClasspath")
+    }
+    def bad = persistenceJars.findAll { !(it.name ==~ /jakarta\.persistence-api-3\.2.*/) }
+    if (!bad.isEmpty()) {
+      throw new GradleException(
+        "jakarta.persistence-api must be 3.2.x for Spring Boot 4 / Hibernate 7; found: ${bad*.name}. "
+          + "CloudEvents BOM 5.0.x can downgrade this via jakartaee-bom 10 — use CloudEvents >= 5.1.0."
+      )
+    }
+  }
+}
+
 tasks.named("check") {
   dependsOn testing.suites.integrationTest
   dependsOn javadoc
+  dependsOn assertJpaApiVersion
+}
+
+tasks.named("bootJar") {
+  dependsOn assertJpaApiVersion
 }
 
 // Add this to ensure checkstyle runs before check
