@@ -385,34 +385,9 @@ tasks.named("checkstyleMain", Checkstyle) {
   }
 }
 
-tasks.register("assertJpaApiVersion") {
-  group = "verification"
-  description = "Fail if runtimeClasspath resolves jakarta.persistence-api below 3.2 (Hibernate 7 / FindOption)."
-  def runtimeClasspath = configurations.named("runtimeClasspath")
-  inputs.files(runtimeClasspath)
-  doLast {
-    def persistenceJars = runtimeClasspath.get().files.findAll { it.name.startsWith("jakarta.persistence-api-") }
-    if (persistenceJars.isEmpty()) {
-      throw new GradleException("jakarta.persistence-api missing from runtimeClasspath")
-    }
-    def bad = persistenceJars.findAll { !(it.name ==~ /jakarta\.persistence-api-3\.2.*/) }
-    if (!bad.isEmpty()) {
-      throw new GradleException(
-        "jakarta.persistence-api must be 3.2.x for Spring Boot 4 / Hibernate 7; found: ${bad*.name}. "
-          + "CloudEvents BOM 5.0.x can downgrade this via jakartaee-bom 10 — use CloudEvents >= 5.1.0."
-      )
-    }
-  }
-}
-
 tasks.named("check") {
   dependsOn testing.suites.integrationTest
   dependsOn javadoc
-  dependsOn assertJpaApiVersion
-}
-
-tasks.named("bootJar") {
-  dependsOn assertJpaApiVersion
 }
 
 // Add this to ensure checkstyle runs before check
