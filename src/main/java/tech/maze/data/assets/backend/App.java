@@ -10,8 +10,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * The main entry point of the Spring Boot application.
  *
- * <p>Redis auto-configuration is excluded by default; enable it via
- * {@code maze.sync.session-store=redis} ({@code SyncRedisConfiguration}).
+ * <p>Redis auto-configuration is excluded by default so memory session mode does not
+ * require a Redis host. When {@code maze.sync.session-store=redis},
+ * {@code SyncRedisConfiguration} registers {@code StringRedisTemplate} explicitly
+ * (exclude cannot be undone via {@code @ImportAutoConfiguration}).
  */
 @SpringBootApplication(exclude = {
     DataRedisAutoConfiguration.class,
